@@ -4,6 +4,9 @@ on:
     - cron: '*/5 * * * *'  # Every 5 minutes
   workflow_dispatch:
 
+permissions:
+  contents: write  # This line fixes the permission issue
+
 jobs:
   monitor:
     runs-on: ubuntu-latest
