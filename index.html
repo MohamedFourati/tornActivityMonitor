@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torn Activity Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        
+        .user-section {
+            margin-bottom: 40px;
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            margin-top: 10px;
+        }
+        
+        .calendar-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            margin-bottom: 5px;
+        }
+        
+        .day-header {
+            text-align: center;
+            font-weight: bold;
+            padding: 5px;
+        }
+        
+        .day {
+            aspect-ratio: 1;
+            border: 1px solid #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .day.online-high { background-color: #2d5a2d; }
+        .day.online-medium { background-color: #1a3d1a; }
+        .day.online-low { background-color: #0d2a0d; }
+        .day.offline { background-color: #444; }
+        .day.no-data { background-color: #222; }
+        
+        .legend {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            font-size: 12px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border: 1px solid #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Torn Activity Monitor</h1>
+    <div id="users-container"></div>
+
+    <script>
+        async function loadActivityData() {
+            try {
+                const response = await fetch('data/activity_data.json');
+                return await response.json();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                return {};
+            }
+        }
+
+        function calculateDayActivity(periods, date) {
+            const dayPeriods = periods.filter(p => p.date === date);
+            let totalMinutes = 0;
+            
+            dayPeriods.forEach(period => {
+                const start = period.start;
+                const end = period.end || Math.floor(Date.now() / 1000);
+                totalMinutes += (end - start) / 60;
+            });
+            
+            if (totalMinutes > 240) return 'online-high';      // 4+ hours
+            if (totalMinutes > 60) return 'online-medium';     // 1+ hour
+            if (totalMinutes > 0) return 'online-low';         // Any activity
+            return 'offline';
+        }
+
+        function createCalendar(userData) {
+            const container = document.createElement('div');
+            container.className = 'user-section';
+            
+            const title = document.createElement('h2');
+            title.textContent = userData.name || 'Unknown User';
+            container.appendChild(title);
+            
+            // Calendar header
+            const header = document.createElement('div');
+            header.className = 'calendar-header';
+            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                dayHeader.textContent = day;
+                header.appendChild(dayHeader);
+            });
+            container.appendChild(header);
+            
+            // Calendar grid
+            const calendar = document.createElement('div');
+            calendar.className = 'calendar';
+            
+            const today = new Date();
+            const startDate = new Date(today);
+            startDate.setDate(today.getDate() - 29); // 30 days total
+            
+            // Find the start of the week
+            const startOfWeek = new Date(startDate);
+            startOfWeek.setDate(startDate.getDate() - startDate.getDay());
+            
+            // Generate calendar days
+            for (let i = 0; i < 42; i++) { // 6 weeks max
+                const currentDate = new Date(startOfWeek);
+                currentDate.setDate(startOfWeek.getDate() + i);
+                
+                const dayElement = document.createElement('div');
+                dayElement.className = 'day';
+                dayElement.textContent = currentDate.getDate();
+                
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const isInRange = currentDate >= startDate && currentDate <= today;
+                
+                if (!isInRange) {
+                    dayElement.classList.add('no-data');
+                    dayElement.style.opacity = '0.3';
+                } else {
+                    const activityLevel = calculateDayActivity(userData.online_periods || [], dateStr);
+                    dayElement.classList.add(activityLevel);
+                }
+                
+                calendar.appendChild(dayElement);
+            }
+            
+            container.appendChild(calendar);
+            
+            // Legend
+            const legend = document.createElement('div');
+            legend.className = 'legend';
+            legend.innerHTML = `
+                <div class="legend-item">
+                    <div class="legend-color online-high"></div>
+                    <span>High Activity (4+ hours)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color online-medium"></div>
+                    <span>Medium Activity (1+ hour)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color online-low"></div>
+                    <span>Low Activity (&lt;1 hour)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color offline"></div>
+                    <span>No Activity</span>
+                </div>
+            `;
+            container.appendChild(legend);
+            
+            return container;
+        }
+
+        async function init() {
+            const data = await loadActivityData();
+            const container = document.getElementById('users-container');
+            
+            if (Object.keys(data).length === 0) {
+                container.innerHTML = '<p>No activity data available yet.</p>';
+                return;
+            }
+            
+            Object.values(data).forEach(userData => {
+                container.appendChild(createCalendar(userData));
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
