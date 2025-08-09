@@ -1,7 +1,13 @@
 {
   "2111896": {
     "name": "stabby",
-    "sessions": [],
+    "sessions": [
+      {
+        "start": 1754711741,
+        "end": null,
+        "date": "2025-08-09"
+      }
+    ],
     "stats": {}
   }
 }
